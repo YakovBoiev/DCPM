@@ -1,23 +1,24 @@
+import json
 import time
 
 import requests
 from bs4 import BeautifulSoup
 
-
-class Vacancy:
-    def __init__(self, job_title, link, salary_min, salary_max, salary_currency):
-        self.job_title = job_title
-        self.link = link
-        self.salary_min = salary_min
-        self.salary_max = salary_max
-        self.salary_currency = salary_currency
-        self.vacancy_site = 'https://hh.ru'
-
-
 HEADERS = {
     "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)'
                   ' Chrome/97.0.4692.71 Safari/537.36'
 }
+
+
+def create_vacancy_dict(job_title, link, salary_min, salary_max, salary_currency):
+    return {
+        'job_title': job_title,
+        'link': link,
+        'salary_min': salary_min,
+        'salary_max': salary_max,
+        'salary_currency': salary_currency,
+        'vacancy_site': 'https://hh.ru'
+    }
 
 
 def get_input_data():
@@ -49,8 +50,14 @@ def get_salary_info(salary_str):
         while salary_info and salary_info[-1].isdigit:
             egg = salary_info.pop()
             salary = egg + salary
-        salary_min = salary
+        if salary:
+            salary_min = salary
     return salary_min, salary_max, currency
+
+
+def write_data(data):
+    with open('test.json', "w") as f:
+        json.dump(data, f, indent=4)
 
 
 def make_request(url):
@@ -70,7 +77,7 @@ def make_request(url):
                 salary_min, salary_max, salary_currency = get_salary_info(span.text)
             else:
                 salary_min, salary_max, salary_currency = None, None, None
-            vacancy = Vacancy(job_title, vacancy_link, salary_min, salary_max, salary_currency)
+            vacancy = create_vacancy_dict(job_title, vacancy_link, salary_min, salary_max, salary_currency)
             data.append(vacancy)
     except Exception as e:
         print(e)
@@ -85,8 +92,9 @@ def pipeline():
         data = make_request(url)
         result_data.extend(data)
         time.sleep(1)
+        write_data(result_data)
     return result_data
 
 
 if __name__ == "__main__":
-    data = pipeline()
+    pipeline()
