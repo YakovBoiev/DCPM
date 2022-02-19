@@ -1,8 +1,13 @@
 import json
 import time
-
 import requests
 from bs4 import BeautifulSoup
+from pymongo import MongoClient
+
+
+client = MongoClient('localhost', 27017)
+
+db = client['test']
 
 HEADERS = {
     "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)'
@@ -57,7 +62,12 @@ def get_salary_info(salary_str):
 
 def write_data(data):
     with open('test.json', "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+
+def write_data_db(data):
+    vacancies = db.vacancy_coll
+    vacancies.insert_many(data)
 
 
 def make_request(url):
@@ -79,6 +89,7 @@ def make_request(url):
                 salary_min, salary_max, salary_currency = None, None, None
             vacancy = create_vacancy_dict(job_title, vacancy_link, salary_min, salary_max, salary_currency)
             data.append(vacancy)
+        write_data_db(data)
     except Exception as e:
         print(e)
     return data
@@ -92,7 +103,7 @@ def pipeline():
         data = make_request(url)
         result_data.extend(data)
         time.sleep(1)
-        write_data(result_data)
+    # write_data(result_data)
     return result_data
 
 
