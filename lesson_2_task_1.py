@@ -1,5 +1,6 @@
 import json
 import time
+from pprint import pprint
 import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
@@ -48,15 +49,15 @@ def get_salary_info(salary_str):
         salary = egg + salary
     spam = salary_info.pop()
     if spam == "от":
-        salary_min = salary
+        salary_min = int(salary)
     else:
-        salary_max = salary
+        salary_max = int(salary)
         salary = ""
         while salary_info and salary_info[-1].isdigit:
             egg = salary_info.pop()
             salary = egg + salary
         if salary:
-            salary_min = salary
+            salary_min = int(salary)
     return salary_min, salary_max, currency
 
 
@@ -68,6 +69,15 @@ def write_data(data):
 def write_data_db(data):
     vacancies = db.vacancy_coll
     vacancies.insert_many(data)
+
+
+def output_vacancy_salary_min():
+    salary_min = int(input('Введите минимальную зарплату '))
+    vacancies = db.vacancy_coll
+    vacancy_list = vacancies.find({'salary_min': {'$gt': salary_min}},)
+    # vacancy_list = vacancies.find({'&end': [{'salary_min': {'$gt': salary_min}}, {'salary_currency': {"$eq": 'руб.'}}]})
+    for vacancy in vacancy_list:
+        pprint(vacancy)
 
 
 def make_request(url):
@@ -104,6 +114,7 @@ def pipeline():
         result_data.extend(data)
         time.sleep(1)
     # write_data(result_data)
+    output_vacancy_salary_min()
     return result_data
 
 
