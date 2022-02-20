@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
 
+URL = 'https://hh.ru/search/vacancy'
 MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
 MONGO_DB = 'test'
@@ -32,9 +33,13 @@ def get_input_data():
     return vacancy_name, int(number_page)
 
 
-def get_url(vacancy_name, page):
-    return f'https://hh.ru/search/vacancy?clusters=true&ored_clusters=true&enable_snippets=true&salary=' \
-           f'&text={vacancy_name}&page={page}&hhtmFrom=vacancy_search_list'
+def get_params(vacancy_name, page):
+    params = {
+        'text': vacancy_name,
+        'page': str(page),
+        'hhtmFrom': 'vacancy_search_list'
+    }
+    return params
 
 
 def get_salary_info(salary_str):
@@ -82,10 +87,10 @@ def output_vacancy_salary_min(db):
         pprint(vacancy)
 
 
-def make_request(url):
+def make_request(url, params):
     data = []
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=HEADERS, params=params)
         response.raise_for_status()
         html_string = response.text
         soup = BeautifulSoup(html_string, "html.parser")
@@ -112,12 +117,11 @@ def pipeline():
     with MongoClient(MONGO_HOST, MONGO_PORT) as client:
         db = client[MONGO_DB]
         for page in range(number_page):
-            url = get_url(vacancy_name, page)
-            data = make_request(url)
+            params = get_params(vacancy_name, page)
+            data = make_request(URL, params)
             write_data_db(db, data)
             result_data.extend(data)
             time.sleep(1)
-        # write_data(result_data)
         output_vacancy_salary_min(db)
     return result_data
 
