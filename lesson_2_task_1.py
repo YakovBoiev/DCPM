@@ -5,10 +5,9 @@ import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
 
-
-client = MongoClient('localhost', 27017)
-
-db = client['test']
+MONGO_HOST = 'localhost'
+MONGO_PORT = 27017
+MONGO_DB = 'test'
 
 HEADERS = {
     "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)'
@@ -66,16 +65,19 @@ def write_data(data):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-def write_data_db(data):
-    vacancies = db.vacancy_coll
-    vacancies.insert_many(data)
+def write_data_db(db, data):
+    collection = db['vacancy_col']
+    for vacancy in data:
+        if collection.find_one({'link': vacancy['link']}):
+            continue
+        collection.insert_one(vacancy)
 
 
-def output_vacancy_salary_min():
+def output_vacancy_salary_min(db):
     salary_min = int(input('Введите минимальную зарплату '))
-    vacancies = db.vacancy_coll
-    vacancy_list = vacancies.find({'salary_min': {'$gt': salary_min}},)
-    # vacancy_list = vacancies.find({'&end': [{'salary_min': {'$gt': salary_min}}, {'salary_currency': {"$eq": 'руб.'}}]})
+    collection = db['vacancy_col']
+    vacancy_list = collection.find({'salary_min': {'$gt': salary_min}}, )
+    # vacancy_list = collection.find({'&end': [{'salary_min': {'$gt': salary_min}}, {'salary_currency': 'руб.'}]})
     for vacancy in vacancy_list:
         pprint(vacancy)
 
@@ -99,7 +101,6 @@ def make_request(url):
                 salary_min, salary_max, salary_currency = None, None, None
             vacancy = create_vacancy_dict(job_title, vacancy_link, salary_min, salary_max, salary_currency)
             data.append(vacancy)
-        write_data_db(data)
     except Exception as e:
         print(e)
     return data
@@ -108,13 +109,16 @@ def make_request(url):
 def pipeline():
     result_data = []
     vacancy_name, number_page = get_input_data()
-    for page in range(number_page):
-        url = get_url(vacancy_name, page)
-        data = make_request(url)
-        result_data.extend(data)
-        time.sleep(1)
-    # write_data(result_data)
-    output_vacancy_salary_min()
+    with MongoClient(MONGO_HOST, MONGO_PORT) as client:
+        db = client[MONGO_DB]
+        for page in range(number_page):
+            url = get_url(vacancy_name, page)
+            data = make_request(url)
+            write_data_db(db, data)
+            result_data.extend(data)
+            time.sleep(1)
+        # write_data(result_data)
+        output_vacancy_salary_min(db)
     return result_data
 
 
