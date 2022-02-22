@@ -1,8 +1,14 @@
 import json
 import time
-
+from pprint import pprint
 import requests
 from bs4 import BeautifulSoup
+from pymongo import MongoClient
+
+URL = 'https://hh.ru/search/vacancy'
+MONGO_HOST = 'localhost'
+MONGO_PORT = 27017
+MONGO_DB = 'test'
 
 HEADERS = {
     "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)'
@@ -27,9 +33,13 @@ def get_input_data():
     return vacancy_name, int(number_page)
 
 
-def get_url(vacancy_name, page):
-    return f'https://hh.ru/search/vacancy?clusters=true&ored_clusters=true&enable_snippets=true&salary=' \
-           f'&text={vacancy_name}&page={page}&hhtmFrom=vacancy_search_list'
+def get_params(vacancy_name, page):
+    params = {
+        'text': vacancy_name,
+        'page': str(page),
+        'hhtmFrom': 'vacancy_search_list'
+    }
+    return params
 
 
 def get_salary_info(salary_str):
@@ -43,27 +53,44 @@ def get_salary_info(salary_str):
         salary = egg + salary
     spam = salary_info.pop()
     if spam == "от":
-        salary_min = salary
+        salary_min = int(salary)
     else:
-        salary_max = salary
+        salary_max = int(salary)
         salary = ""
         while salary_info and salary_info[-1].isdigit:
             egg = salary_info.pop()
             salary = egg + salary
         if salary:
-            salary_min = salary
+            salary_min = int(salary)
     return salary_min, salary_max, currency
 
 
 def write_data(data):
     with open('test.json', "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 
-def make_request(url):
+def write_data_db(db, data):
+    collection = db['vacancy_col']
+    for vacancy in data:
+        if collection.find_one({'link': vacancy['link']}):
+            continue
+        collection.insert_one(vacancy)
+
+
+def output_vacancy_salary_min(db):
+    salary_min = int(input('Введите минимальную зарплату '))
+    collection = db['vacancy_col']
+    vacancy_list = collection.find({'salary_min': {'$gt': salary_min}}, )
+    # vacancy_list = collection.find({'&end': [{'salary_min': {'$gt': salary_min}}, {'salary_currency': 'руб.'}]})
+    for vacancy in vacancy_list:
+        pprint(vacancy)
+
+
+def make_request(url, params):
     data = []
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(url, headers=HEADERS, params=params)
         response.raise_for_status()
         html_string = response.text
         soup = BeautifulSoup(html_string, "html.parser")
@@ -87,12 +114,15 @@ def make_request(url):
 def pipeline():
     result_data = []
     vacancy_name, number_page = get_input_data()
-    for page in range(number_page):
-        url = get_url(vacancy_name, page)
-        data = make_request(url)
-        result_data.extend(data)
-        time.sleep(1)
-        write_data(result_data)
+    with MongoClient(MONGO_HOST, MONGO_PORT) as client:
+        db = client[MONGO_DB]
+        for page in range(number_page):
+            params = get_params(vacancy_name, page)
+            data = make_request(URL, params)
+            write_data_db(db, data)
+            result_data.extend(data)
+            time.sleep(1)
+        output_vacancy_salary_min(db)
     return result_data
 
 
