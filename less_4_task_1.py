@@ -15,8 +15,6 @@ params = {
 MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
 MONGO_DB = 'news'
-
-
 URL = 'https://www.rambler.ru'
 ITEM_XPATH = '//div[@class="ILgW"]'
 LINK_ITEM = './a/@href'
@@ -34,11 +32,11 @@ def create_news_dict(link, news, news_agency, date):
 
 
 def write_data_db(db, data):
-    collection = db['vacancy_col']
-    for vacancy in data:
-        if collection.find_one({'link': vacancy['link']}):
+    collection = db['news']
+    for news in data:
+        if collection.find_one({'link': news['link']}):
             continue
-        collection.insert_one(vacancy)
+        collection.insert_one(news)
 
 
 def make_request():
@@ -66,7 +64,9 @@ def pipeline():
         db = client[MONGO_DB]
         write_data_db(db, data)
 
-pipeline()
+
+if __name__ == "__main__":
+    pipeline()
 
 
 
